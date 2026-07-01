@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>寒风刺骨 — 答题器</title>
+    <style>
+        /* ===== 全局重置 ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg:       #0b1219;
+            --surface:  #141e28;
+            --border:   #1e2d3d;
+            --ice:      #7ec8e0;
+            --ice-dim:  #3a6b80;
+            --frost:    #b8dff0;
+            --text:     #c8d6e0;
+            --text-dim: #6b7d8e;
+            --red:      #e0556a;
+            --green:    #4caf8e;
+            --amber:    #d4a843;
+            --radius:   8px;
+            --radius-sm: 4px;
+            --shadow:   0 4px 24px rgba(0,0,0,0.45);
+        }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.7;
+        }
+
+        /* ===== 顶部标题栏 ===== */
+        .app-header {
+            background: linear-gradient(180deg, #101e2c 0%, #0b1722 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 18px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+        .app-header .inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .app-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            background: linear-gradient(135deg, #a8d8ea, #5ba4bf, #7ec8e0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .app-title .frost {
+            font-size: 11px;
+            display: block;
+            letter-spacing: 2px;
+            opacity: 0.6;
+            -webkit-text-fill-color: #5b8fa0;
+        }
+
+        /* ===== 主布局 ===== */
+        .main-wrap {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 28px 24px 60px;
+        }
+
+        /* ===== 工具栏 ===== */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+            padding: 16px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .toolbar .label {
+            font-size: 13px;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+        .toolbar select, .toolbar button {
+            background: var(--bg);
+            color: var(--frost);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: all .2s;
+            font-family: inherit;
+        }
+        .toolbar select:hover, .toolbar button:hover {
+            border-color: var(--ice-dim);
+            color: #fff;
+        }
+        .toolbar button.primary {
+            background: #1a3a48;
+            border-color: var(--ice-dim);
+            color: var(--frost);
+            font-weight: 600;
+        }
+        .toolbar button.primary:hover {
+            background: #224758;
+            border-color: var(--ice);
+        }
+        .toolbar button.danger {
+            background: #3a1a22;
+            border-color: #5a2a32;
+            color: #e8a0aa;
+        }
+        .toolbar button.danger:hover {
+            background: #4a2230;
+            border-color: #8a3a44;
+        }
+        .score-badge {
+            margin-left: auto;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--ice);
+            white-space: nowrap;
+        }
+        .score-badge span { font-size: 24px; }
+
+        /* ===== 进度条 ===== */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--ice-dim), var(--ice));
+            border-radius: 2px;
+            transition: width .3s;
+        }
+
+        /* ===== 题目卡片 ===== */
+        .question-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px 30px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            transition: border-color .2s;
+        }
+        .question-card.answered          { border-color: var(--ice-dim); }
+        .question-card.correct           { border-color: var(--green); border-left: 3px solid var(--green); }
+        .question-card.incorrect         { border-color: var(--red);   border-left: 3px solid var(--red); }
+        .question-card.correct::after,
+        .question-card.incorrect::after {
+            position: absolute;
+            top: 20px;
+            right: 24px;
+            font-size: 18px;
+            font-weight: 700;
+            pointer-events: none;
+        }
+        .question-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .q-num {
+            flex-shrink: 0;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            background: var(--border);
+            color: var(--text-dim);
+            letter-spacing: 0;
+        }
+        .q-num.single  { background: #1a3040; color: #7ec8e0; }
+        .q-num.multi   { background: #2a2818; color: #d4a843; }
+        .q-num.judge   { background: #1a2820; color: #4caf8e; }
+        .q-type-tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
+        .q-type-tag.single  { background: #1a3040; color: #7ec8e0; }
+        .q-type-tag.multi   { background: #2a2818; color: #d4a843; }
+        .q-type-tag.judge   { background: #1a2820; color: #4caf8e; }
+        .q-text {
+            font-size: 15px;
+            line-height: 1.75;
+            color: #e8f0f5;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== 选项 ===== */
+        .options { display: flex; flex-direction: column; gap: 8px; }
+        .option {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all .18s;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .option:hover { border-color: var(--ice-dim); background: #111e28; }
+        .option input { display: none; }
+        .option .dot {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s;
+            margin-top: 2px;
+        }
+        .option.multi-opt .dot { border-radius: 3px; }
+        .option.selected { border-color: var(--ice); background: #101e2a; }
+        .option.selected .dot { border-color: var(--ice); background: var(--ice); }
+        .option.selected .dot::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--bg);
+        }
+        .option.multi-opt.selected .dot::after {
+            content: '✓';
+            width: auto; height: auto;
+            border-radius: 0;
+            background: none;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .option.correct-answer { border-color: var(--green) !important; background: #0f2018 !important; }
+        .option.correct-answer .dot { border-color: var(--green); background: var(--green); }
+        .option.wrong-answer     { border-color: var(--red)   !important; background: #200f14 !important; }
+        .option.wrong-answer .dot { border-color: var(--red); background: var(--red); }
+
+        /* ===== 解释提示 ===== */
+        .explain {
+            margin-top: 14px;
+            padding: 12px 16px;
+            background: #0f1a1f;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--ice);
+            border-left: 3px solid var(--ice-dim);
+            letter-spacing: 0.5px;
+            display: none;
+        }
+        .question-card.show-explain .explain { display: block; }
+
+        /* ===== 底部提交区 ===== */
+        .submit-bar {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-top: 28px;
+            padding: 18px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            align-items: center;
+        }
+        .submit-bar button {
+            padding: 10px 28px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border: none;
+            transition: all .2s;
+            font-family: inherit;
+        }
+        .btn-submit { background: var(--ice-dim); color: #fff; }
+        .btn-submit:hover { background: var(--ice); }
+        .btn-reset  { background: transparent; color: var(--text-dim); border: 1px solid var(--border) !important; }
+        .btn-reset:hover { color: #fff; border-color: var(--text-dim) !important; }
+        .btn-nav { background: transparent; color: var(--frost); border: 1px solid var(--border) !important; font-weight: 400; }
+        .btn-nav:hover { border-color: var(--ice-dim) !important; }
+
+        /* ===== 底部 ===== */
+        .app-footer {
+            text-align: center;
+            padding: 40px 0;
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 700px) {
+            .app-title { font-size: 18px; }
+            .toolbar { gap: 8px; padding: 12px; }
+            .toolbar select, .toolbar button { font-size: 12px; padding: 6px 10px; }
+            .question-card { padding: 18px 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== 顶部 ===== -->
+<header class="app-header">
+    <div class="inner">
+        <div>
+            <span class="app-title">寒风刺骨<span class="frost">— HÁN FĒNG CÌ GǓ —</span></span>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);letter-spacing:2px;">马中化 · 答题器</div>
+    </div>
+</header>
+
+<!-- ===== 主体 ===== -->
+<div class="main-wrap" id="app">
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <span class="label">📋 题型:</span>
+        <select id="typeFilter" onchange="renderAll()">
+            <option value="all">全部（111题）</option>
+            <option value="single">单选题（53题）</option>
+            <option value="multi">多选题（28题）</option>
+            <option value="judge">判断题（30题）</option>
+        </select>
+        <button class="primary" onclick="checkAll()">✅ 提交批改</button>
+        <button class="danger"  onclick="resetAll()">🔄 重置全部</button>
+        <button onclick="collapseAll()">📄 折叠题目</button>
+        <div class="score-badge">得分:&nbsp;<span id="scoreDisplay">-</span></div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
+
+    <!-- 题目列表 -->
+    <div id="questionList"></div>
+
+    <!-- 底部操作 -->
+    <div class="submit-bar">
+        <button class="btn-submit" onclick="checkAll()">✅ 提交批改</button>
+        <button class="btn-reset"  onclick="resetAll()">🔄 重置全部</button>
+        <button class="btn-nav"    onclick="scrollToTop()">⬆ 回到顶部</button>
+        <span style="margin-left:auto;font-size:13px;color:var(--text-dim);">
+            已答: <strong id="answeredCount" style="color:var(--frost);">0</strong> / <span id="totalCount">111</span>
+        </span>
+    </div>
+</div>
+
+<div class="app-footer">❄ 寒风刺骨 · 马中化答题器 &copy; 2026 ❄</div>
+
+<!-- ===== 题库数据 + 核心逻辑 ===== -->
+<script>
+// ==================== 题库 ====================
+const QUIZ = [
+    // ---- 单选题 1-53 ----
+    {id:1,  type:'single', q:'毛泽东最先提出马克思主义中国化时代化这个命题是在（　）。',
+     opts:['《论新阶段》','《改造我们的学习》','《反对本本主义》','《实践论》'], ans:[0]},
+    {id:2,  type:'single', q:'马克思主义中国化时代化两大理论成果之间的关系是（　）。',
+     opts:['批判与否定','继承与超越','一脉相承又与时俱进','没什么关系'], ans:[2]},
+    {id:3,  type:'single', q:'中国特色社会主义理论体系不包括（　）。',
+     opts:['毛泽东思想','邓小平理论','三个代表重要思想','科学发展观'], ans:[0]},
+    {id:4,  type:'single', q:'毛泽东思想形成的时代背景是（　）。',
+     opts:['帝国主义战争与无产阶级革命成为时代主题','和平与发展成为时代主题','世界多极化成为时代主题','经济全球化成为时代主题'], ans:[0]},
+    {id:5,  type:'single', q:'新民主主义革命的领导阶级是（　）。',
+     opts:['民族资产阶级','无产阶级','小资产阶级','农民阶级'], ans:[1]},
+    {id:6,  type:'single', q:'社会主义制度在中国的确立是在（　）。',
+     opts:['1949年','1952年','1956年','1958年'], ans:[2]},
+    {id:7,  type:'single', q:'《论十大关系》中确立的关于社会主义建设的基本方针是（　）。',
+     opts:['消灭资本主义','大力发展生产力','调动一切积极因素为社会主义事业服务','阶级斗争必须常抓不懈'], ans:[2]},
+    {id:8,  type:'single', q:'马克思主义中国化的第一次历史性飞跃的理论成果是（　）。',
+     opts:['邓小平理论','毛泽东思想','科学发展观','习近平新时代中国特色社会主义思想'], ans:[1]},
+    {id:9,  type:'single', q:'毛泽东思想活的灵魂是实事求是、群众路线和（　）。',
+     opts:['独立自主','改革开放','与时俱进','解放思想'], ans:[0]},
+    {id:10, type:'single', q:'中国新民主主义革命最基本的动力是（　）。',
+     opts:['民族资产阶级','农民阶级','无产阶级','城市小资产阶级'], ans:[2]},
+    {id:11, type:'single', q:'中国新民主主义革命的首要对象是（　）。',
+     opts:['封建主义','官僚资本主义','帝国主义','民族资产阶级'], ans:[2]},
+    {id:12, type:'single', q:'党在过渡时期总路线的核心内容可以概括为（　）。',
+     opts:['一化三改','一个中心、两个基本点','三步走发展战略','四个现代化'], ans:[0]},
+    {id:13, type:'single', q:'我国对资本主义工商业进行社会主义改造的主要方式是（　）。',
+     opts:['暴力没收','和平赎买','强制兼并','自由竞争'], ans:[1]},
+    {id:14, type:'single', q:'《论十大关系》的发表，标志着党（　）。',
+     opts:['探索中国社会主义建设道路的良好开端','完成社会主义工业化建设','彻底消灭剥削制度','确立新民主主义基本纲领'], ans:[0]},
+    {id:15, type:'single', q:'（　）对毛泽东和毛泽东思想的历史地位作了科学的、实事求是的评价。',
+     opts:['《反对本本主义》','《关于建国以来党的若干历史问题的决议》','《实践论》','《新民主主义论》'], ans:[1]},
+    {id:16, type:'single', q:'毛泽东思想形成和发展的实践基础是（　）。',
+     opts:['中国共产党领导人民进行革命和建设的成功实践','中国共产党领导的工人运动','中国共产党领导的农民运动','中国共产党领导的学生运动'], ans:[0]},
+    {id:17, type:'single', q:'以毛泽东为代表的中国共产党人初步开辟了农村包围城市、武装夺取政权革命道路是在（　）。',
+     opts:['国民革命战争时期','土地革命战争时期','抗日战争时期','解放战争时期'], ans:[1]},
+    {id:18, type:'single', q:'中国共产党的根本工作路线是（　）。',
+     opts:['实事求是','群众路线','独立自主','自力更生'], ans:[1]},
+    {id:19, type:'single', q:'近代中国的社会性质和主要矛盾决定了中国的革命性质是（　）。',
+     opts:['无产阶级民主革命','社会主义革命','民族资产革命','资产阶级民主革命'], ans:[3]},
+    {id:20, type:'single', q:'过渡时期总路线的主体是（　）。',
+     opts:['社会主义工业化','私营经济的国有化','个体农业的集体化','对个体农业、手工业和资本主义工商业的改造'], ans:[0]},
+    {id:21, type:'single', q:'（　）的召开，实现了新中国成立以来党的历史上具有深远意义的伟大转折。',
+     opts:['中共十一届三中全会','中共十二大','中共十三大','中共十一届六中全会'], ans:[0]},
+    {id:22, type:'single', q:'邓小平理论首要的基本的理论问题是（　）。',
+     opts:['什么是社会主义，怎样建设社会主义','什么是新民主主义，怎样建设新民主主义','实现什么样的发展，怎样发展','建设什么样的党，怎样建设党'], ans:[0]},
+    {id:23, type:'single', q:'党在社会主义初级阶段基本路线的简明概括是（　）。',
+     opts:['四项基本原则','"一个中心、两个基本点"','改革开放','两手抓，两手都要硬'], ans:[1]},
+    {id:24, type:'single', q:'我国社会主义初级阶段是指（　）。',
+     opts:['从新中国成立到社会主义改造基本完成','从社会主义改造基本完成到基本实现社会主义现代化','从党的十一届三中全会到全面建成小康社会','从新中国成立到基本实现社会主义现代化'], ans:[1]},
+    {id:25, type:'single', q:'我国经济体制改革的目标是建立（　）。',
+     opts:['自由放任的市场经济体制','社会主义计划经济体制','有计划的商品经济体制','社会主义市场经济体制'], ans:[3]},
+    {id:26, type:'single', q:'社会主义最大的优越性是（　）。',
+     opts:['共同富裕','生产发展','社会和谐','人民民主'], ans:[0]},
+    {id:27, type:'single', q:'（　）深入发展促使世界各国经济日益紧密联系在一起。',
+     opts:['世界多极化','大国争霸','科技进步','经济全球化'], ans:[3]},
+    {id:28, type:'single', q:'党和国家的生命线，人民的幸福线指是（　）。',
+     opts:['党的基本纲领','党的基本经验','党的基本方略','党的基本路线'], ans:[3]},
+    {id:29, type:'single', q:'1980年5月，（　）第一次提出社会主义的本质这个概念。',
+     opts:['毛泽东','邓小平','江泽民','胡锦涛'], ans:[1]},
+    {id:30, type:'single', q:'1978年3月全国科学大会上，邓小平提出：四个现代化，关键是（　）现代化。',
+     opts:['工业','农业','国防','科学技术'], ans:[3]},
+    {id:31, type:'single', q:'邓小平和我们党对当代中国基本国情的科学判断是（　）。',
+     opts:['我国是最大的发展中国家','我国正处于并长期处于社会主义初级阶段','中国特色社会主义进入新时代','我国已经是发达社会主义'], ans:[1]},
+    {id:32, type:'single', q:'20世纪70年代，整个世界发生着大变动大调整，时代主题是（　）。',
+     opts:['革命与战争','和平与发展','合作与共赢','开放与融通'], ans:[1]},
+    {id:33, type:'single', q:'邓小平理论首要的基本的理论问题是（　）。',
+     opts:['什么是社会主义、怎样建设社会主义','建设什么样的党、怎样建设党','实现什么样的发展、怎样发展','新时代坚持和发展什么样的中国特色社会主义'], ans:[0]},
+    {id:34, type:'single', q:'社会主义改造完成后，我国社会的主要矛盾是（　）。',
+     opts:['人民对建立先进工业国的要求和落后农业国现实的矛盾','人民日益增长的美好生活需要同不平衡不充分发展的矛盾','人民日益增长的物质文化需要同落后的社会生产之间的矛盾','社会主义道路同资本主义道路的矛盾'], ans:[2]},
+    {id:35, type:'single', q:'邓小平对社会主义本质的概括中，属于从生产关系角度认识和把握的是（　）。',
+     opts:['解放生产力','发展生产力','消灭剥削，消除两级分化','最终达到共同富裕'], ans:[2]},
+    {id:36, type:'single', q:'1982年邓小平在党的十二大开幕词中明确提出：走自己的道路，（　）。',
+     opts:['建设社会主义市场经济','建设有中国特色的社会主义','实现马克思主义中国化时代化','建设社会主义初级阶段'], ans:[1]},
+    {id:37, type:'single', q:'（　）是党执政兴国的第一要务。',
+     opts:['发展','改革','执政','开放'], ans:[0]},
+    {id:38, type:'single', q:'科学发展观的根本方法是（　）。',
+     opts:['以人为本','全面协调可持续','统筹兼顾','发展'], ans:[2]},
+    {id:39, type:'single', q:'全面协调可持续中的"可持续"是指（　）。',
+     opts:['发展要有协调性、均衡性','发展要有全面性、整体性','发展要有持久性、连续性','发展要有速度、效率'], ans:[2]},
+    {id:40, type:'single', q:'（　）是经济社会发展中最活跃、最具革命性的因素。',
+     opts:['人力资源','工业化水平','科学技术','党的执政能力'], ans:[2]},
+    {id:41, type:'single', q:'科学发展观最鲜明的精神实质是（　）。',
+     opts:['解放思想、实事求是、与时俱进、求真务实','立党为公，执政为民','实事求是、群众路线、独立自主','真理性与实践性的统一'], ans:[0]},
+    {id:42, type:'single', q:'（　）是关于发展的本质、目的、内涵和要求的总体看法和根本观点。',
+     opts:['社会观','价值观','发展观','世界观'], ans:[2]},
+    {id:43, type:'single', q:'下面哪一项不属于三个代表重要思想的内容（　）。',
+     opts:['始终代表中国先进生产力的发展要求','始终代表先进科技的发展方向','始终代表中国先进文化的前进方向','始终代表中国最广大人民的根本利益'], ans:[1]},
+    {id:44, type:'single', q:'科学发展观的第一要义是（　）。',
+     opts:['以人为本','发展','全面协调可持续','统筹兼顾'], ans:[1]},
+    {id:45, type:'single', q:'科学发展观强调，社会主义民主政治的本质和核心是（　）。',
+     opts:['党的领导','人民当家作主','依法治国','协商民主'], ans:[1]},
+    {id:46, type:'single', q:'科学发展观提出，建设生态文明的方针是（　）。',
+     opts:['节约优先、保护优先、自然恢复为主','开发优先、利用优先、人工修复为主','发展优先、效率优先、综合治理为主','保护优先、治理优先、绿色发展为主'], ans:[0]},
+    {id:47, type:'single', q:'科学发展观强调，推进社会主义文化强国建设，要树立高度的（　）。',
+     opts:['制度自信和道路自信','文化自觉和文化自信','理论自信和文化自信','民族自信和国家自信'], ans:[1]},
+    {id:48, type:'single', q:'科学发展观提出，加快转变经济发展方式的主攻方向是（　）。',
+     opts:['科技创新','经济结构战略性调整','扩大内需','对外开放'], ans:[1]},
+    {id:49, type:'single', q:'党的（　）大正式把社会主义市场经济体制确立为我国经济体制改革的目标。',
+     opts:['十二','十三','十四','十五'], ans:[2]},
+    {id:50, type:'single', q:'胡锦涛指出：（　）是马克思主义政党的本质属性。',
+     opts:['先进性','纯洁性','革命性','无产阶级属性'], ans:[0]},
+    {id:51, type:'single', q:'在当代中国，坚持发展是硬道理的本质要求就是（　）。',
+     opts:['坚持经济发展','坚持可持续发展','坚持全面发展','坚持科学发展'], ans:[3]},
+    {id:52, type:'single', q:'根据科学发展观，（　）是加快转变经济发展方式的关键。',
+     opts:['全面深化经济体制改革','实施创新驱动发展战略','推动经济结构战略性调整','促进区域协调发展'], ans:[0]},
+    {id:53, type:'single', q:'胡锦涛强调，决定着中国特色社会主义发展方向的是（　）。',
+     opts:['社会主义核心价值体系','社会主义市场经济体制','中国共产党的领导和执政','发展社会主义生产力'], ans:[0]},
+
+    // ---- 多选题 54-81 ----
+    {id:54, type:'multi', q:'新民主主义革命的对象是（　）。',
+     opts:['民族资产阶级','帝国主义','官僚资本主义','封建主义'], ans:[1,2,3]},
+    {id:55, type:'multi', q:'新民主主义革命与社会主义革命的关系是（　）。',
+     opts:['二者的性质一样','新民主主义革命是社会主义革命的必要准备','社会主义革命是新民主主义革命的必然趋势','二者没有关系'], ans:[1,2]},
+    {id:56, type:'multi', q:'我国对个体农业实行社会主义改造必须遵循的原则有（　）。',
+     opts:['自愿互利','典型示范','国家帮助','公私兼顾'], ans:[0,1,2]},
+    {id:57, type:'multi', q:'社会主义社会存在的两类不同性质的矛盾是（　）。',
+     opts:['资产阶级和无产阶级的矛盾','干部和群众的矛盾','敌我矛盾','人民内部矛盾'], ans:[2,3]},
+    {id:58, type:'multi', q:'新民主主义革命的三大法宝包括（　）。',
+     opts:['统一战线','武装斗争','党的建设','实事求是'], ans:[0,1,2]},
+    {id:59, type:'multi', q:'新民主主义社会的主要经济成分有（　）。',
+     opts:['社会主义国营经济','个体经济','私人资本主义经济','合作社经济'], ans:[0,1,2,3]},
+    {id:60, type:'multi', q:'中国共产党在社会主义建设道路初步探索中取得的理论成果有（　）。',
+     opts:['提出正确处理人民内部矛盾的理论','提出走中国工业化道路的思想','提出百花齐放、百家争鸣的方针','调动一切积极因素为社会主义建设服务'], ans:[0,1,3]},
+    {id:61, type:'multi', q:'标志着毛泽东思想初步形成的重要文章主要有（　）。',
+     opts:['《中国的红色政权为什么能够存在？》','《井冈山的斗争》','《星星之火可以燎原》','《反对本本主义》'], ans:[0,1,2,3]},
+    {id:62, type:'multi', q:'新民主主义革命的动力包括（　）。',
+     opts:['工人阶级','农民阶级','城市小资产阶级','民族资产阶级'], ans:[0,1,2,3]},
+    {id:63, type:'multi', q:'社会主义改造的任务完成以后，我国社会的基本矛盾是（　）。',
+     opts:['敌我矛盾','人民内部矛盾','生产力和生产关系的矛盾','经济基础和上层建筑的矛盾'], ans:[2,3]},
+    {id:64, type:'multi', q:'党的八大指出，社会主义制度在我国已经基本上建立起来了，国内的主要矛盾已经是（　）。',
+     opts:['人民日益增长的物质文化需要同落后的社会生产之间的矛盾','人民对于建立先进的工业国的要求同落后的农业国的现实之间的矛盾','人民对于经济文化迅速发展的需要同当前经济文化不能满足人民需要的状况之间的矛盾','无产阶级和资产阶级的矛盾'], ans:[1,2]},
+    {id:65, type:'multi', q:'邓小平提出的"两手抓，两手都要硬"包括（　）。',
+     opts:['一手抓物质文明，一手抓精神文明','一手抓建设，一手抓法制','一手抓改革开放，一手抓惩治腐败','一手抓改革，一手抓开放'], ans:[0,1,2]},
+    {id:66, type:'multi', q:'社会主义本质的内容包括（　）。',
+     opts:['解放生产力，发展生产力','消灭剥削','消除两极分化','最终达到共同富裕'], ans:[0,1,2,3]},
+    {id:67, type:'multi', q:'邓小平提出的判断改革和一切工作是非得失的标准是（　）。',
+     opts:['是否有利于巩固社会主义制度','是否有利于发展社会主义社会的生产力','是否有利于增强社会主义国家的综合国力','是否有利于提高人民生活水平'], ans:[1,2,3]},
+    {id:68, type:'multi', q:'发展先进文化，要把弘扬主旋律和提倡多样化统一起来，（　）。',
+     opts:['支持健康有益的','积极吸收外来的','努力改造落后的','坚决抵制腐朽文化'], ans:[0,2,3]},
+    {id:69, type:'multi', q:'以人为本的"人"，包括（　）。',
+     opts:['工人','农民','知识分子','社会各阶层'], ans:[0,1,2,3]},
+    {id:70, type:'multi', q:'科学发展观强调，推进生态文明建设，必须树立的生态文明理念有（　）。',
+     opts:['尊重自然','顺应自然','保护自然','征服自然'], ans:[0,1,2]},
+    {id:71, type:'multi', q:'新世纪新阶段，我国进入（　），经济社会发展呈现一系列新的阶段性特征。',
+     opts:['发展关键期','改革攻坚期','开放活跃期','矛盾凸显期'], ans:[0,1,3]},
+    {id:72, type:'multi', q:'以习近平同志为核心的党中央统揽（　），创立习近平新时代中国特色社会主义思想。',
+     opts:['伟大斗争','伟大工程','伟大事业','伟大梦想'], ans:[0,1,2,3]},
+    {id:73, type:'multi', q:'邓小平南方谈话中提出三个有利于标准（　）。',
+     opts:['是否有利于发展社会主义社会的生产力','是否有利于增强社会主义国家的综合国力','是否有利于提高人民的生活水平','是否有利于融入全球体制'], ans:[0,1,2]},
+    {id:74, type:'multi', q:'推动形成人与自然和谐发展现代化建设新格局，具体做法包括（　）。',
+     opts:['珍惜每一寸国土','全面促进资源节约','加大生态环境保护力度','加快建立生态文明制度'], ans:[0,1,2,3]},
+    {id:75, type:'multi', q:'科学发展观最鲜明的精神实质包括（　）。',
+     opts:['解放思想','实事求是','与时俱进','求真务实'], ans:[0,1,2,3]},
+    {id:76, type:'multi', q:'党在社会主义初级阶段的基本路线中，（　）是实现奋斗目标的基本途径。',
+     opts:['领导和团结全国各族人民','以经济建设为中心','坚持四项基本原则','坚持改革开放'], ans:[1,2,3]},
+    {id:77, type:'multi', q:'邓小平的社会主义市场经济理论具有丰富的内涵，包括（　）。',
+     opts:['计划经济和市场经济不是划分社会主义制度的标志','计划和市场都是经济手段','市场经济作为资源配置手段本身不具有制度属性','坚持社会主义制度与市场经济的结合，是社会主义市场经济的特色所在、优势所在'], ans:[0,1,2,3]},
+    {id:78, type:'multi', q:'江泽民同志认为，中国共产党必须解决好的两大历史性课题是（　）。',
+     opts:['纠正党的不良作风','进一步提高党的领导水平和执政水平','防范四大危险','提高拒腐防变和抵御风险的能力'], ans:[1,3]},
+    {id:79, type:'multi', q:'党的十六届三中全会上，胡锦涛明确指出：树立和落实（　）的科学发展观。',
+     opts:['全面发展','协调发展','可持续发展','高质量发展'], ans:[0,1,2]},
+    {id:80, type:'multi', q:'实现（　），是我国社会主义现代化建设的战略任务。',
+     opts:['工业化','信息化','城镇化','农业现代化'], ans:[0,1,2,3]},
+    {id:81, type:'multi', q:'人与自然和谐相处，就是（　）。',
+     opts:['生产发展','生活富裕','生态良好','生命安全'], ans:[0,1,2]},
+
+    // ---- 判断题 82-111 ----
+    {id:82,  type:'judge', q:'毛泽东思想就是毛泽东的思想。（　）', opts:[], ans:[1]},
+    {id:83,  type:'judge', q:'逐步实现国家的社会主义工业化是党在过渡时期总路线的主体。（　）', opts:[], ans:[0]},
+    {id:84,  type:'judge', q:'邓小平理论是中国特色社会主义理论体系的开篇之作。（　）', opts:[], ans:[0]},
+    {id:85,  type:'judge', q:'计划多一点还是市场多一点，是社会主义和资本主义的本质区别。（　）', opts:[], ans:[1]},
+    {id:86,  type:'judge', q:'改革是社会主义制度的自我完善和发展。（　）', opts:[], ans:[0]},
+    {id:87,  type:'judge', q:'新民主主义革命的领导阶级是民族资产阶级。（　）', opts:[], ans:[1]},
+    {id:88,  type:'judge', q:'实事求是是中国共产党思想路线的核心，也是毛泽东思想的精髓。（　）', opts:[], ans:[0]},
+    {id:89,  type:'judge', q:'党的十九大、十九届六中全会提出的"十个明确""十四个坚持""十三个方面成就"概括了习近平新时代中国特色社会主义思想的主要内容。（　）', opts:[], ans:[0]},
+    {id:90,  type:'judge', q:'建设中国特色社会主义，关键在于坚持、加强和改善党的领导。（　）', opts:[], ans:[0]},
+    {id:91,  type:'judge', q:'为了更好地实现"三步走"的现代化发展战略，邓小平提出了以全局带动重点的思想。（　）', opts:[], ans:[1]},
+    {id:92,  type:'judge', q:'党的十八大以来，以习近平同志为主要代表的中国共产党人创立了习近平新时代中国特色社会主义思想。（　）', opts:[], ans:[0]},
+    {id:93,  type:'judge', q:'在党的六届六中全会上，刘少奇代表党中央做了《关于修改党章的报告》，对马克思主义中国化从理论上做了进一步阐述。（　）', opts:[], ans:[1]},
+    {id:94,  type:'judge', q:'社会主义初级阶段中所说的"初级阶段"，不是泛指任何国家进入社会主义都会经历的起始阶段。（　）', opts:[], ans:[0]},
+    {id:95,  type:'judge', q:'自力更生，艰苦奋斗是实现奋斗目标的基本途径。（　）', opts:[], ans:[1]},
+    {id:96,  type:'judge', q:'1982年邓小平在党的十二大开幕词中明确提出：走自己的路，建设有中国特色的社会主义。（　）', opts:[], ans:[0]},
+    {id:97,  type:'judge', q:'建设社会主义政治文明，必须发展社会主义民主。（　）', opts:[], ans:[0]},
+    {id:98,  type:'judge', q:'发挥市场机制的作用和国家宏观调控，是社会主义市场经济体制的基本要求。（　）', opts:[], ans:[1]},
+    {id:99,  type:'judge', q:'建设社会文明实质上就是要建设以资源环境承载力为基础、以自然规律为准则、以可持续发展为目的的资源节约型环境友好型社会。（　）', opts:[], ans:[1]},
+    {id:100, type:'judge', q:'胡锦涛强调，确保到2035年实现全面建成小康社会的宏伟目标。（　）', opts:[], ans:[1]},
+    {id:101, type:'judge', q:'扩大产能是我国经济社会发展的基本立足点和长期战略方针，也是调整经济结构的首要任务。（　）', opts:[], ans:[1]},
+    {id:102, type:'judge', q:'三个代表重要思想，成功把中国特色社会主义推向21世纪。（　）', opts:[], ans:[0]},
+    {id:103, type:'judge', q:'改革是党执政兴国的第一要务。（　）', opts:[], ans:[1]},
+    {id:104, type:'judge', q:'构建社会主义和谐社会的总要求是民主法治、公平正义、诚信友爱、充满活力、安定有序、人与自然和谐相处。（　）', opts:[], ans:[0]},
+    {id:105, type:'judge', q:'推动形成人与自然和谐发展现代化建设新格局，是保持经济平稳较快发展、提高人民生活质量、促进社会和谐稳定的必然要求。（　）', opts:[], ans:[0]},
+    {id:106, type:'judge', q:'推动经济持续健康发展，必须坚持以科学发展为主线。（　）', opts:[], ans:[1]},
+    {id:107, type:'judge', q:'党的一切工作，必须以最广大人民的根本利益为最高标准。（　）', opts:[], ans:[0]},
+    {id:108, type:'judge', q:'三个代表重要思想回答和解决的是"建设什么样的党、怎样建设党"的重大问题。（　）', opts:[], ans:[0]},
+    {id:109, type:'judge', q:'推进社会主义文化强国建设，是关系人民福祉、关乎民族未来的长远大计。（　）', opts:[], ans:[1]},
+    {id:110, type:'judge', q:'保持和发展党的先进性是马克思主义政党自身建设的根本任务和永恒课题。（　）', opts:[], ans:[0]},
+    {id:111, type:'judge', q:'邓小平理论是全面建设小康社会、加快推进社会主义现代化的根本指针。（　）', opts:[], ans:[1]}
+];
+
+// 判断题统一补上选项
+QUIZ.forEach(q => { if (q.type === 'judge') q.opts = ['对（√）','错（×）']; });
+
+// 用户作答状态  { id: [选中的索引数组] }
+let userAnswers = {};
+let showResult = false;
+
+// ==================== 渲染 ====================
+function getFiltered() {
+    const f = document.getElementById('typeFilter').value;
+    if (f === 'all') return QUIZ;
+    return QUIZ.filter(q => q.type === f);
+}
+
+function renderAll() {
+    const list = getFiltered();
+    const container = document.getElementById('questionList');
+    let html = '';
+    list.forEach(q => {
+        html += renderOne(q);
+    });
+    container.innerHTML = html;
+    document.getElementById('totalCount').textContent = list.length;
+    updateStats();
+}
+
+function renderOne(q) {
+    const ua = userAnswers[q.id] || [];
+    let cardClass = 'question-card';
+    let explainHtml = '';
+    if (showResult) {
+        const correct = isCorrect(q, ua);
+        cardClass += correct ? ' correct' : ' incorrect';
+        cardClass += ' show-explain';
+        const ansLabels = q.ans.map(i => String.fromCharCode(65+i)).join('、');
+        const typeLabel = q.type === 'single' ? '正确答案' : q.type === 'multi' ? '正确答案' : '正确答案';
+        explainHtml = `<div class="explain">📌 ${typeLabel}：${ansLabels}. ${q.ans.map(i => q.opts[i]).join('；')}</div>`;
+    } else if (ua.length > 0) {
+        cardClass += ' answered';
+    }
+
+    const typeTag = q.type === 'single' ? '<span class="q-type-tag single">单选</span>'
+                  : q.type === 'multi'  ? '<span class="q-type-tag multi">多选</span>'
+                  : '<span class="q-type-tag judge">判断</span>';
+    const numClass = q.type === 'single' ? 'single' : q.type === 'multi' ? 'multi' : 'judge';
+
+    let optsHtml = '';
+    if (q.type === 'judge') {
+        optsHtml = renderJudgeOptions(q, ua);
+    } else if (q.type === 'multi') {
+        optsHtml = renderMultiOptions(q, ua);
+    } else {
+        optsHtml = renderSingleOptions(q, ua);
+    }
+
+    return `<div class="${cardClass}" id="q-${q.id}" style="position:relative;">
+        <div class="question-header">
+            <div class="q-num ${numClass}">${q.id}</div>
+            ${typeTag}
+            <div class="q-text">${q.q}</div>
+        </div>
+        <div class="options">${optsHtml}</div>
+        ${explainHtml}
+    </div>`;
+}
+
+function renderSingleOptions(q, ua) {
+    const labels = ['A','B','C','D'];
+    return q.opts.map((o,i) => {
+        let cls = 'option';
+        if (ua.includes(i)) cls += ' selected';
+        if (showResult) {
+            if (q.ans.includes(i)) cls += ' correct-answer';
+            else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
+        }
+        return `<label class="${cls}" onclick="selectOption(${q.id},${i},'single')">
+            <input type="radio" name="q${q.id}"><span class="dot"></span>${labels[i]}. ${o}
+        </label>`;
+    }).join('');
+}
+
+function renderMultiOptions(q, ua) {
+    const labels = ['A','B','C','D','E','F'];
+    return q.opts.map((o,i) => {
+        let cls = 'option multi-opt';
+        if (ua.includes(i)) cls += ' selected';
+        if (showResult) {
+            if (q.ans.includes(i)) cls += ' correct-answer';
+            else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
+        }
+        return `<label class="${cls}" onclick="selectOption(${q.id},${i},'multi')">
+            <input type="checkbox"><span class="dot"></span>${labels[i]}. ${o}
+        </label>`;
+    }).join('');
+}
+
+function renderJudgeOptions(q, ua) {
+    const labels = ['A','B'];
+    return q.opts.map((o,i) => {
+        let cls = 'option';
+        if (ua.includes(i)) cls += ' selected';
+        if (showResult) {
+            if (q.ans.includes(i)) cls += ' correct-answer';
+            else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
+        }
+        return `<label class="${cls}" onclick="selectOption(${q.id},${i},'judge')">
+            <input type="radio" name="q${q.id}"><span class="dot"></span>${o}
+        </label>`;
+    }).join('');
+}
+
+function selectOption(qid, idx, type) {
+    if (showResult) return; // 已提交后不允许修改
+    if (type === 'multi') {
+        // 多选：toggle
+        let arr = userAnswers[qid] || [];
+        if (arr.includes(idx)) arr = arr.filter(v => v !== idx);
+        else arr.push(idx);
+        userAnswers[qid] = arr;
+    } else {
+        // 单选/判断：替换
+        userAnswers[qid] = [idx];
+    }
+    renderAll();
+}
+
+function isCorrect(q, ua) {
+    if (ua.length !== q.ans.length) return false;
+    const sortedUA = [...ua].sort();
+    const sortedAns = [...q.ans].sort();
+    return sortedUA.every((v,i) => v === sortedAns[i]);
+}
+
+// ==================== 操作 ====================
+function checkAll() {
+    showResult = true;
+    renderAll();
+    updateStats();
+    // 滚动到第一个错误
+    const firstWrong = document.querySelector('.question-card.incorrect');
+    if (firstWrong) firstWrong.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function resetAll() {
+    if (showResult || Object.keys(userAnswers).length > 0) {
+        if (!confirm('确定要重置全部作答记录吗？此操作不可撤销。')) return;
+    }
+    userAnswers = {};
+    showResult = false;
+    renderAll();
+}
+
+function collapseAll() {
+    showResult = false;
+    renderAll();
+}
+
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateStats() {
+    const list = getFiltered();
+    const total = list.length;
+    let answered = 0, correct = 0;
+    list.forEach(q => {
+        const ua = userAnswers[q.id] || [];
+        if (ua.length > 0) answered++;
+        if (showResult && isCorrect(q, ua)) correct++;
+    });
+    document.getElementById('answeredCount').textContent = answered;
+    document.getElementById('totalCount').textContent = total;
+    document.getElementById('progressFill').style.width = total > 0 ? (answered / total * 100) + '%' : '0%';
+    document.getElementById('scoreDisplay').textContent = showResult ? `${correct}/${total}` : '-';
+}
+
+// ==================== 初始化 ====================
+renderAll();
+</script>
+</body>
+</html>
