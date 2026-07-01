@@ -354,9 +354,8 @@
             <option value="multi">多选题（28题）</option>
             <option value="judge">判断题（30题）</option>
         </select>
-        <button class="primary" onclick="checkAll()">✅ 提交批改</button>
+        <button class="primary" onclick="checkAll()">✅ 一键批改全部</button>
         <button class="danger"  onclick="resetAll()">🔄 重置全部</button>
-        <button onclick="collapseAll()">📄 折叠题目</button>
         <div class="score-badge">得分:&nbsp;<span id="scoreDisplay">-</span></div>
     </div>
 
@@ -368,7 +367,7 @@
 
     <!-- 底部操作 -->
     <div class="submit-bar">
-        <button class="btn-submit" onclick="checkAll()">✅ 提交批改</button>
+        <button class="btn-submit" onclick="checkAll()">✅ 一键批改全部</button>
         <button class="btn-reset"  onclick="resetAll()">🔄 重置全部</button>
         <button class="btn-nav"    onclick="scrollToTop()">⬆ 回到顶部</button>
         <span style="margin-left:auto;font-size:13px;color:var(--text-dim);">
@@ -587,7 +586,7 @@ QUIZ.forEach(q => { if (q.type === 'judge') q.opts = ['对（√）','错（×�
 
 // 用户作答状态  { id: [选中的索引数组] }
 let userAnswers = {};
-let showResult = false;
+let submittedQuestions = {};
 
 // ==================== 渲染 ====================
 function getFiltered() {
@@ -612,12 +611,12 @@ function renderOne(q) {
     const ua = userAnswers[q.id] || [];
     let cardClass = 'question-card';
     let explainHtml = '';
-    if (showResult) {
+    if (submittedQuestions[q.id]) {
         const correct = isCorrect(q, ua);
         cardClass += correct ? ' correct' : ' incorrect';
         cardClass += ' show-explain';
         const ansLabels = q.ans.map(i => String.fromCharCode(65+i)).join('、');
-        const typeLabel = q.type === 'single' ? '正确答案' : q.type === 'multi' ? '正确答案' : '正确答案';
+        const typeLabel = '正确答案';
         explainHtml = `<div class="explain">📌 ${typeLabel}：${ansLabels}. ${q.ans.map(i => q.opts[i]).join('；')}</div>`;
     } else if (ua.length > 0) {
         cardClass += ' answered';
@@ -653,7 +652,7 @@ function renderSingleOptions(q, ua) {
     return q.opts.map((o,i) => {
         let cls = 'option';
         if (ua.includes(i)) cls += ' selected';
-        if (showResult) {
+        if (submittedQuestions[q.id]) {
             if (q.ans.includes(i)) cls += ' correct-answer';
             else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
         }
@@ -668,7 +667,7 @@ function renderMultiOptions(q, ua) {
     return q.opts.map((o,i) => {
         let cls = 'option multi-opt';
         if (ua.includes(i)) cls += ' selected';
-        if (showResult) {
+        if (submittedQuestions[q.id]) {
             if (q.ans.includes(i)) cls += ' correct-answer';
             else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
         }
@@ -683,7 +682,7 @@ function renderJudgeOptions(q, ua) {
     return q.opts.map((o,i) => {
         let cls = 'option';
         if (ua.includes(i)) cls += ' selected';
-        if (showResult) {
+        if (submittedQuestions[q.id]) {
             if (q.ans.includes(i)) cls += ' correct-answer';
             else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
         }
@@ -694,17 +693,17 @@ function renderJudgeOptions(q, ua) {
 }
 
 function selectOption(qid, idx, type) {
-    if (showResult) return; // 已提交后不允许修改
+    if (submittedQuestions[qid]) return;
     if (type === 'multi') {
-        // 多选：toggle
         let arr = userAnswers[qid] || [];
         if (arr.includes(idx)) arr = arr.filter(v => v !== idx);
         else arr.push(idx);
         userAnswers[qid] = arr;
     } else {
-        // 单选/判断：替换
         userAnswers[qid] = [idx];
     }
+    // 选择后立即显示答案
+    submittedQuestions[qid] = true;
     renderAll();
 }
 
@@ -717,25 +716,20 @@ function isCorrect(q, ua) {
 
 // ==================== 操作 ====================
 function checkAll() {
-    showResult = true;
+    const list = getFiltered();
+    list.forEach(q => { submittedQuestions[q.id] = true; });
     renderAll();
     updateStats();
-    // 滚动到第一个错误
     const firstWrong = document.querySelector('.question-card.incorrect');
     if (firstWrong) firstWrong.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function resetAll() {
-    if (showResult || Object.keys(userAnswers).length > 0) {
+    if (Object.keys(submittedQuestions).length > 0 || Object.keys(userAnswers).length > 0) {
         if (!confirm('确定要重置全部作答记录吗？此操作不可撤销。')) return;
     }
     userAnswers = {};
-    showResult = false;
-    renderAll();
-}
-
-function collapseAll() {
-    showResult = false;
+    submittedQuestions = {};
     renderAll();
 }
 
@@ -750,12 +744,13 @@ function updateStats() {
     list.forEach(q => {
         const ua = userAnswers[q.id] || [];
         if (ua.length > 0) answered++;
-        if (showResult && isCorrect(q, ua)) correct++;
+        if (submittedQuestions[q.id] && isCorrect(q, ua)) correct++;
     });
     document.getElementById('answeredCount').textContent = answered;
     document.getElementById('totalCount').textContent = total;
     document.getElementById('progressFill').style.width = total > 0 ? (answered / total * 100) + '%' : '0%';
-    document.getElementById('scoreDisplay').textContent = showResult ? `${correct}/${total}` : '-';
+    const hasSubmitted = Object.keys(submittedQuestions).length > 0;
+    document.getElementById('scoreDisplay').textContent = hasSubmitted ? `${correct}/${total}` : '-';
 }
 
 // ==================== 初始化 ====================
