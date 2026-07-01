@@ -267,6 +267,8 @@
         .option.correct-answer .dot { border-color: var(--green); background: var(--green); }
         .option.wrong-answer     { border-color: var(--red)   !important; background: #200f14 !important; }
         .option.wrong-answer .dot { border-color: var(--red); background: var(--red); }
+        .option.missed-correct   { border-color: var(--amber) !important; background: #1f1a0d !important; }
+        .option.missed-correct .dot { border-color: var(--amber); background: var(--amber); }
 
         /* ===== 解释提示 ===== */
         .explain {
@@ -281,6 +283,43 @@
             display: none;
         }
         .question-card.show-explain .explain { display: block; }
+
+        /* 多选确认按钮 */
+        .confirm-multi-wrap {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .confirm-multi-btn {
+            padding: 8px 22px;
+            background: var(--ice-dim);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all .2s;
+            font-family: inherit;
+        }
+        .confirm-multi-btn:hover {
+            background: var(--ice);
+        }
+        .confirm-multi-btn:disabled {
+            background: #1e2d38;
+            color: #4a5a68;
+            cursor: not-allowed;
+        }
+        .confirm-multi-btn:disabled:hover {
+            background: #1e2d38;
+        }
+        .confirm-multi-hint {
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
 
         /* ===== 底部提交区 ===== */
         .submit-bar {
@@ -582,178 +621,174 @@ const QUIZ = [
 ];
 
 // 判断题统一补上选项
-QUIZ.forEach(q => { if (q.type === 'judge') q.opts = ['对（√）','错（×）']; });
+QUIZ.forEach(function(q){ if(q.type==='judge') q.opts=['对（√）','错（×）']; });
 
-// 用户作答状态  { id: [选中的索引数组] }
-let userAnswers = {};
-let submittedQuestions = {};
+var userAnswers = {};
+var submittedQuestions = {};
 
-// ==================== 渲染 ====================
-function getFiltered() {
-    const f = document.getElementById('typeFilter').value;
-    if (f === 'all') return QUIZ;
-    return QUIZ.filter(q => q.type === f);
+function getFiltered(){
+    var f = document.getElementById('typeFilter').value;
+    return f==='all' ? QUIZ : QUIZ.filter(function(q){ return q.type===f; });
 }
 
-function renderAll() {
-    const list = getFiltered();
-    const container = document.getElementById('questionList');
-    let html = '';
-    list.forEach(q => {
-        html += renderOne(q);
-    });
-    container.innerHTML = html;
+function renderAll(){
+    var list = getFiltered();
+    var html = '';
+    list.forEach(function(q){ html += renderOne(q); });
+    document.getElementById('questionList').innerHTML = html;
     document.getElementById('totalCount').textContent = list.length;
     updateStats();
 }
 
-function renderOne(q) {
-    const ua = userAnswers[q.id] || [];
-    let cardClass = 'question-card';
-    let explainHtml = '';
-    if (submittedQuestions[q.id]) {
-        const correct = isCorrect(q, ua);
-        cardClass += correct ? ' correct' : ' incorrect';
-        cardClass += ' show-explain';
-        const ansLabels = q.ans.map(i => String.fromCharCode(65+i)).join('、');
-        const typeLabel = '正确答案';
-        explainHtml = `<div class="explain">📌 ${typeLabel}：${ansLabels}. ${q.ans.map(i => q.opts[i]).join('；')}</div>`;
-    } else if (ua.length > 0) {
-        cardClass += ' answered';
+function renderOne(q){
+    var ua = userAnswers[q.id] || [];
+    var cls = 'question-card';
+    var exp = '';
+    if(submittedQuestions[q.id]){
+        var ok = isCorrect(q,ua);
+        cls += ok ? ' correct' : ' incorrect';
+        cls += ' show-explain';
+        var al = q.ans.map(function(i){ return String.fromCharCode(65+i); }).join('、');
+        exp = '<div class="explain">📌 正确答案：'+al+'. '+q.ans.map(function(i){ return q.opts[i]; }).join('；')+'</div>';
+    } else if(ua.length>0){
+        cls += ' answered';
     }
+    var tg = q.type==='single'?'<span class="q-type-tag single">单选</span>'
+           : q.type==='multi'?'<span class="q-type-tag multi">多选</span>'
+           :'<span class="q-type-tag judge">判断</span>';
+    var nc = q.type==='single'?'single':q.type==='multi'?'multi':'judge';
+    var oh = '';
+    if(q.type==='judge') oh = renderJudgeOptions(q,ua);
+    else if(q.type==='multi') oh = renderMultiOptions(q,ua);
+    else oh = renderSingleOptions(q,ua);
+    return '<div class="'+cls+'" id="q-'+q.id+'" style="position:relative;">'
+        +'<div class="question-header"><div class="q-num '+nc+'">'+q.id+'</div>'+tg
+        +'<div class="q-text">'+q.q+'</div></div>'
+        +'<div class="options">'+oh+'</div>'+exp+'</div>';
+}
 
-    const typeTag = q.type === 'single' ? '<span class="q-type-tag single">单选</span>'
-                  : q.type === 'multi'  ? '<span class="q-type-tag multi">多选</span>'
-                  : '<span class="q-type-tag judge">判断</span>';
-    const numClass = q.type === 'single' ? 'single' : q.type === 'multi' ? 'multi' : 'judge';
+function renderSingleOptions(q,ua){
+    var L = ['A','B','C','D'];
+    return q.opts.map(function(o,i){
+        var c = 'option';
+        if(ua.indexOf(i)>=0) c += ' selected';
+        if(submittedQuestions[q.id]){
+            if(q.ans.indexOf(i)>=0 && ua.indexOf(i)>=0) c += ' correct-answer';
+            else if(q.ans.indexOf(i)>=0 && ua.indexOf(i)<0) c += ' missed-correct';
+            else if(q.ans.indexOf(i)<0 && ua.indexOf(i)>=0) c += ' wrong-answer';
+        }
+        return '<label class="'+c+'" onclick="selectOption('+q.id+','+i+',\'single\')">'
+            +'<input type="radio" name="q'+q.id+'"><span class="dot"></span>'+L[i]+'. '+o+'</label>';
+    }).join('');
+}
 
-    let optsHtml = '';
-    if (q.type === 'judge') {
-        optsHtml = renderJudgeOptions(q, ua);
-    } else if (q.type === 'multi') {
-        optsHtml = renderMultiOptions(q, ua);
-    } else {
-        optsHtml = renderSingleOptions(q, ua);
+function renderMultiOptions(q,ua){
+    var L = ['A','B','C','D','E','F'];
+    var h = q.opts.map(function(o,i){
+        var c = 'option multi-opt';
+        if(ua.indexOf(i)>=0) c += ' selected';
+        if(submittedQuestions[q.id]){
+            if(q.ans.indexOf(i)>=0 && ua.indexOf(i)>=0) c += ' correct-answer';
+            else if(q.ans.indexOf(i)>=0 && ua.indexOf(i)<0) c += ' missed-correct';
+            else if(q.ans.indexOf(i)<0 && ua.indexOf(i)>=0) c += ' wrong-answer';
+        }
+        return '<div class="'+c+'" onclick="selectOption('+q.id+','+i+',\'multi\')">'
+            +'<span class="dot"></span>'+L[i]+'. '+o+'</div>';
+    }).join('');
+    if(!submittedQuestions[q.id]){
+        var hasSel = (ua.length > 0);
+        h += '<div class="confirm-multi-wrap">'
+            +'<button class="confirm-multi-btn" onclick="confirmMulti('+q.id+')"'
+            +(hasSel ? '' : ' disabled')
+            +'>✅ 提交本题</button>'
+            +(hasSel ? '' : '<span class="confirm-multi-hint">请先选择选项，再点提交</span>')
+            +'</div>';
     }
-
-    return `<div class="${cardClass}" id="q-${q.id}" style="position:relative;">
-        <div class="question-header">
-            <div class="q-num ${numClass}">${q.id}</div>
-            ${typeTag}
-            <div class="q-text">${q.q}</div>
-        </div>
-        <div class="options">${optsHtml}</div>
-        ${explainHtml}
-    </div>`;
+    return h;
 }
 
-function renderSingleOptions(q, ua) {
-    const labels = ['A','B','C','D'];
-    return q.opts.map((o,i) => {
-        let cls = 'option';
-        if (ua.includes(i)) cls += ' selected';
-        if (submittedQuestions[q.id]) {
-            if (q.ans.includes(i)) cls += ' correct-answer';
-            else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
+function renderJudgeOptions(q,ua){
+    var L = ['A','B'];
+    return q.opts.map(function(o,i){
+        var c = 'option';
+        if(ua.indexOf(i)>=0) c += ' selected';
+        if(submittedQuestions[q.id]){
+            if(q.ans.indexOf(i)>=0 && ua.indexOf(i)>=0) c += ' correct-answer';
+            else if(q.ans.indexOf(i)>=0 && ua.indexOf(i)<0) c += ' missed-correct';
+            else if(q.ans.indexOf(i)<0 && ua.indexOf(i)>=0) c += ' wrong-answer';
         }
-        return `<label class="${cls}" onclick="selectOption(${q.id},${i},'single')">
-            <input type="radio" name="q${q.id}"><span class="dot"></span>${labels[i]}. ${o}
-        </label>`;
+        return '<label class="'+c+'" onclick="selectOption('+q.id+','+i+',\'judge\')">'
+            +'<input type="radio" name="q'+q.id+'"><span class="dot"></span>'+o+'</label>';
     }).join('');
 }
 
-function renderMultiOptions(q, ua) {
-    const labels = ['A','B','C','D','E','F'];
-    return q.opts.map((o,i) => {
-        let cls = 'option multi-opt';
-        if (ua.includes(i)) cls += ' selected';
-        if (submittedQuestions[q.id]) {
-            if (q.ans.includes(i)) cls += ' correct-answer';
-            else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
-        }
-        return `<label class="${cls}" onclick="selectOption(${q.id},${i},'multi')">
-            <input type="checkbox"><span class="dot"></span>${labels[i]}. ${o}
-        </label>`;
-    }).join('');
-}
-
-function renderJudgeOptions(q, ua) {
-    const labels = ['A','B'];
-    return q.opts.map((o,i) => {
-        let cls = 'option';
-        if (ua.includes(i)) cls += ' selected';
-        if (submittedQuestions[q.id]) {
-            if (q.ans.includes(i)) cls += ' correct-answer';
-            else if (ua.includes(i) && !q.ans.includes(i)) cls += ' wrong-answer';
-        }
-        return `<label class="${cls}" onclick="selectOption(${q.id},${i},'judge')">
-            <input type="radio" name="q${q.id}"><span class="dot"></span>${o}
-        </label>`;
-    }).join('');
-}
-
-function selectOption(qid, idx, type) {
-    if (submittedQuestions[qid]) return;
-    if (type === 'multi') {
-        let arr = userAnswers[qid] || [];
-        if (arr.includes(idx)) arr = arr.filter(v => v !== idx);
+function selectOption(qid,idx,type){
+    if(submittedQuestions[qid]) return;
+    if(type==='multi'){
+        var arr = userAnswers[qid] || [];
+        var pos = arr.indexOf(idx);
+        if(pos>=0) arr.splice(pos,1);
         else arr.push(idx);
         userAnswers[qid] = arr;
     } else {
         userAnswers[qid] = [idx];
+        submittedQuestions[qid] = true;
     }
-    // 选择后立即显示答案
+    renderAll();
+}
+
+function confirmMulti(qid){
+    if(!userAnswers[qid] || userAnswers[qid].length===0) return;
     submittedQuestions[qid] = true;
     renderAll();
+    updateStats();
 }
 
-function isCorrect(q, ua) {
-    if (ua.length !== q.ans.length) return false;
-    const sortedUA = [...ua].sort();
-    const sortedAns = [...q.ans].sort();
-    return sortedUA.every((v,i) => v === sortedAns[i]);
+function isCorrect(q,ua){
+    if(ua.length !== q.ans.length) return false;
+    var a = ua.slice().sort();
+    var b = q.ans.slice().sort();
+    for(var i=0; i<a.length; i++){ if(a[i]!==b[i]) return false; }
+    return true;
 }
 
-// ==================== 操作 ====================
-function checkAll() {
-    const list = getFiltered();
-    list.forEach(q => { submittedQuestions[q.id] = true; });
+function checkAll(){
+    var list = getFiltered();
+    list.forEach(function(q){ submittedQuestions[q.id] = true; });
     renderAll();
     updateStats();
-    const firstWrong = document.querySelector('.question-card.incorrect');
-    if (firstWrong) firstWrong.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var fw = document.querySelector('.question-card.incorrect');
+    if(fw) fw.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
-function resetAll() {
-    if (Object.keys(submittedQuestions).length > 0 || Object.keys(userAnswers).length > 0) {
-        if (!confirm('确定要重置全部作答记录吗？此操作不可撤销。')) return;
-    }
+function resetAll(){
+    var hasData = Object.keys(submittedQuestions).length>0 || Object.keys(userAnswers).length>0;
+    if(hasData && !confirm('确定要重置全部作答记录吗？此操作不可撤销。')) return;
     userAnswers = {};
     submittedQuestions = {};
     renderAll();
 }
 
-function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+function scrollToTop(){
+    window.scrollTo({top:0,behavior:'smooth'});
 }
 
-function updateStats() {
-    const list = getFiltered();
-    const total = list.length;
-    let answered = 0, correct = 0;
-    list.forEach(q => {
-        const ua = userAnswers[q.id] || [];
-        if (ua.length > 0) answered++;
-        if (submittedQuestions[q.id] && isCorrect(q, ua)) correct++;
+function updateStats(){
+    var list = getFiltered();
+    var total = list.length;
+    var answered = 0, correct = 0;
+    list.forEach(function(q){
+        var ua = userAnswers[q.id] || [];
+        if(ua.length>0) answered++;
+        if(submittedQuestions[q.id] && isCorrect(q,ua)) correct++;
     });
     document.getElementById('answeredCount').textContent = answered;
     document.getElementById('totalCount').textContent = total;
-    document.getElementById('progressFill').style.width = total > 0 ? (answered / total * 100) + '%' : '0%';
-    const hasSubmitted = Object.keys(submittedQuestions).length > 0;
-    document.getElementById('scoreDisplay').textContent = hasSubmitted ? `${correct}/${total}` : '-';
+    document.getElementById('progressFill').style.width = total>0 ? (answered/total*100)+'%' : '0%';
+    var has = Object.keys(submittedQuestions).length>0;
+    document.getElementById('scoreDisplay').textContent = has ? correct+'/'+total : '-';
 }
 
-// ==================== 初始化 ====================
 renderAll();
 </script>
 </body>
