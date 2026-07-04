@@ -367,6 +367,16 @@
             .toolbar select, .toolbar button { font-size: 12px; padding: 6px 10px; }
             .question-card { padding: 18px 16px; }
         }
+        /* Welcome Modal */
+        .welcome-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+        .welcome-modal{background:#1a2332;border:1px solid #2a4a6a;border-radius:12px;padding:36px 40px;max-width:460px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.5);animation:welcomeIn .3s ease}
+        @keyframes welcomeIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+        .welcome-modal .w-icon{font-size:42px;margin-bottom:12px}
+        .welcome-modal .w-title{font-size:18px;font-weight:700;color:#7ec8e0;margin-bottom:14px;letter-spacing:2px}
+        .welcome-modal .w-msg{font-size:15px;color:#c8d6e0;line-height:1.8;margin-bottom:24px;letter-spacing:1px}
+        .welcome-modal .w-msg strong{color:#e0556a}
+        .welcome-modal .w-btn{padding:10px 48px;background:#1a3a48;color:#b8dff0;border:1px solid #3a6b80;border-radius:6px;font-size:15px;font-weight:600;letter-spacing:4px;cursor:pointer;transition:all .2s;font-family:inherit}
+        .welcome-modal .w-btn:hover{background:#224758;border-color:#7ec8e0;color:#fff}
     </style>
 </head>
 <body>
@@ -791,5 +801,6 @@ function updateStats(){
 
 renderAll();
 </script>
+<div class="welcome-overlay" id="welcomeOverlay"><div class="welcome-modal"><div class="w-icon">❄️</div><div class="w-title">温馨提示</div><div class="w-msg">本次测试仅作参考<br><strong>如有错误一切遵循书本！！！</strong></div><button class="w-btn" onclick="document.getElementById('welcomeOverlay').style.display='none'">确 定</button></div></div>
 </body>
 </html>
